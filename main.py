@@ -1,7 +1,7 @@
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import requests
-import os
+import asyncio
 
 # --- إعدادات المفاتيح ---
 TELEGRAM_TOKEN = "8857793349:AAEGIgZxvEsIo8pmDx7v-gF80Xwe_GC3QwE"
@@ -40,20 +40,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    ai_reply = get_ai_response(text)
-    await update.message.reply_text(ai_reply)
+    if text:
+        ai_reply = get_ai_response(text)
+        await update.message.reply_text(ai_reply)
 
 # --- هيكلة Vercel ---
 async def webhook(request):
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     
-    update = Update.de_json(request.get_json(force=True), application.bot)
+    # تحويل الطلب القادم من تليجرام إلى كائن Update
+    data = await request.get_json()
+    update = Update.de_json(data, application.bot)
     await application.process_update(update)
     return "ok"
 
 # التوافق مع Vercel
 def handler(request):
-    import asyncio
     return asyncio.run(webhook(request))
